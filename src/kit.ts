@@ -260,10 +260,20 @@ export class PasskeyKit extends PasskeyBase {
 
         credentials.signatureExpirationLedger(expiration)
 
+        // Fix for Int64 nonce handling: ensure nonce is properly wrapped in xdr.Int64
+        // The credentials.nonce() returns a value that may not be recognized as a valid Hyper type
+        // when the nonce exceeds Number.MAX_SAFE_INTEGER, causing XDR serialization to fail
+        const nonceValue = credentials.nonce();
+        const nonceBigInt = typeof nonceValue === 'bigint' 
+            ? nonceValue 
+            : (nonceValue && typeof nonceValue.toBigInt === 'function' 
+                ? nonceValue.toBigInt() 
+                : BigInt(String(nonceValue)));
+
         const preimage = xdr.HashIdPreimage.envelopeTypeSorobanAuthorization(
             new xdr.HashIdPreimageSorobanAuthorization({
                 networkId: hash(Buffer.from(this.networkPassphrase)),
-                nonce: credentials.nonce(),
+                nonce: new xdr.Int64(nonceBigInt),
                 signatureExpirationLedger: credentials.signatureExpirationLedger(),
                 invocation: entry.rootInvocation()
             })
